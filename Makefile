@@ -46,5 +46,5 @@ mpi_run: build
 	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile *.pdf
 
 debug: $(DEBUGDIR) all
-	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes mpirun -np 2 $(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt
 	diff resultadoCorreto.txt $(DEBUGDIR)/output.txt > $(DEBUGDIR)/diff.txt
