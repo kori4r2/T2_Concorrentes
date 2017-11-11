@@ -1,5 +1,5 @@
 CFLAGS = -g -Wall -O3
-LINKFLAGS = -fopenmp
+LINKFLAGS = -fopenmp -lm
 PROJECT = GaussJordan
 CC = mpicc
 DEBUGDIR = tests
@@ -36,8 +36,11 @@ clean :
 	rm -f debug*.txt
 	clear
 
-run :
+run : build
 	./$(PROJECT)
+
+mpi_run: build
+	mpirun -np 2 $(PROJECT)
 
 .zip : clean
 	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile *.pdf
