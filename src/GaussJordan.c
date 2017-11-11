@@ -82,12 +82,12 @@ int main(int argc, char *argv[]){
     /*Passo 4: somar linha k com os valores das demais linhas */
     
     
-    /*free(recvbuf);
+    free(recvbuf);
     if(sendcounts != NULL)
     	free(sendcounts);
     if(displs != NULL)
     	free(displs);
-    */
+    
     destroyMatrix(matrix, order);
     free(vector);
 
