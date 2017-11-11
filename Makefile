@@ -1,21 +1,20 @@
-CFLAGS = -g -Wall -std=c++11
-LINKFLAGS = -pthread -std=c++11
+CFLAGS = -g -Wall -O3
+LINKFLAGS = -fopenmp
 PROJECT = GaussJordan
-CC = g++
+CC = mpicc
 DEBUGDIR = tests
 BINDIR = bin
 SRCDIR = src
 LIBDIR = lib
-LIBS := $(wildcard $(LIBDIR)/*hpp)
-SRCS := $(wildcard $(SRCDIR)/*cpp)
-OBJS := $(patsubst $(SRCDIR)/%.cpp, $(BINDIR)/%.o, $(SRCS))
-
-#TO DO: Run on remote server and test it
+SERVERFILES := $(wildcard remoteFiles/*)
+LIBS := $(wildcard $(LIBDIR)/*h)
+SRCS := $(wildcard $(SRCDIR)/*c)
+OBJS := $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCS))
 
 all : build
 
-build : $(BINDIR)
-	$(CC) $(LINKFLAGS) -o $(SERVER) $(SERVEROBJS)
+build : $(BINDIR) $(OBJS)
+	$(CC) $(LINKFLAGS) $(OBJS) -o $(PROJECT)
 
 $(DEBUGDIR) :
 	mkdir -p $(DEBUGDIR)
@@ -23,11 +22,11 @@ $(DEBUGDIR) :
 $(BINDIR) :
 	mkdir -p $(BINDIR)
 
-$(BINDIR)/%.o : $(SRCDIR)/%.cpp $(LIBS)
+$(BINDIR)/%.o : $(SRCDIR)/%.c $(LIBS)
 	$(CC) -c $< -I $(LIBDIR) $(CFLAGS) -o $@
 
-hostfile :
-	scp -P 22200 hosts usuario@halley.lasdpc.icmc.usp.br:/home/usuario/ #TO DO
+sendfiles : build
+	scp -P 22200 $(PROJECT) $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
 
 clean :
 	rm -rf $(BINDIR)
@@ -41,7 +40,8 @@ run :
 	./$(PROJECT)
 
 .zip : clean
-	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile *.pdf Authors.txt
+	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile *.pdf
 
-#debugServer: $(DEBUGDIR) all
-#	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt
+debug: $(DEBUGDIR) all
+	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./$(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt
+	diff resultadoCorreto.txt $(DEBUGDIR)/output.txt > $(DEBUGDIR)/diff.txt

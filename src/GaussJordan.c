@@ -3,15 +3,15 @@
 #include <mpi.h>
 #include <omp.h>
 
-char *myReadLine(FILE *input, bool *endFileReached){
-	char inChar, output = NULL;
+char *myReadLine(FILE *input, int *endFileReached){
+	char inChar, *output = NULL;
 	int count = 0;
 
-	inChar = fgetchar(input);
+	inChar = fgetc(input);
 	while(inChar != '\n' && inChar != EOF){
 		output = (char*)realloc(output, sizeof(char) * (count + 1));
 		output[count++] = inChar;
-		inChar = fgetchar(input);
+		inChar = fgetc(input);
 	}
 	if(count == 0){
 		fprintf(stderr, "Function called at EOF");
@@ -19,7 +19,7 @@ char *myReadLine(FILE *input, bool *endFileReached){
 	} else{
 		output[count++] = '\0';
 		if(inChar == EOF)
-			(*endFileReached) = true;
+			(*endFileReached) = 1;
 	}
 	return output;
 }
