@@ -101,16 +101,17 @@ int main(int argc, char *argv[]){
     pivo_col = 0;
 
     for(int i = 0; i < order; i++){
-    	//preciso disso?
-    	MPI_Bcast(&pivo_col, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
     	//verificar localmente qual o pivo -> struct (valor absoluto, idx)
     		//como verificar o indice?-
     		//como verificar qual indice(linha) ja foi usado?
 
+	    		//->> numero de linhas = num_elements/order
+	    		//->INDICE DA PRIMEIRA LINHA: ((order/num_proc) )*my_rank +(my_rank<rest?my_rank:rest)
+	    		//VETOR com estado de cada linha
+
     	//achar pivo global -> reduce (MAXLOC)
 
-    	//broadcast rank do pivo -> narcar linha como usada
+    	//broadcast rank do pivo -> marcar linha como usada
 
     	//atualizar linha do pivo
 
