@@ -1,4 +1,5 @@
 /*
+ *
 // para compilar: mpicc GaussJordan.c -o GaussJordan -Wall -lm -fopenmp
 // para rodar: mpirun -np 2 GaussJordan
 */
@@ -34,8 +35,15 @@ int main(int argc, char *argv[]){
     if(my_rank == 0){
         printf("sou rank 0\n");
         matrix = getMatrix("matriz.txt", &order);
+		printf("terminei de ler a matriz\n");
+		for(int i = 0; i < order; i++){
+			for(int j = 0; j < order; j++){
+				printf("%2.1lf  ", matrix[(i * order) + j]);
+			}
+			printf("\n");
+		}
         vector = getVector("vetor.txt", order);
-		printf("terminei de ler");
+		printf("terminei de ler o vetor\n");
     }
 
 	printf("Sou rank %d | antes:  order = %d\n", my_rank, order);
@@ -44,8 +52,9 @@ int main(int argc, char *argv[]){
     	
 /*B-scatter da matriz/vetor (varias linhas por processo)*/    
     
+	printf("num_proc = %d\n", num_proc);
     int remainder = (order % num_proc);
-    int num_elements = ((order / num_proc) + (my_rank < remainder)? 1: 0) * order;
+    int num_elements = ((order / num_proc) + ((my_rank < remainder)? 1: 0)) * order;
 	printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
     
     recvbuf = (double *)malloc(sizeof(double) * (num_elements));
@@ -57,7 +66,8 @@ int main(int argc, char *argv[]){
         int sum = 0;
         
         for(int i = 0; i < num_proc; i++){
-            sendcounts[i] = num_elements;
+    		sendcounts[i] = ((order / num_proc) + ((i < remainder)? 1: 0)) * order;
+			printf("sendcounts[%d] = %d\n", i, sendcounts[i]);
             
             displs[i] = sum;
             sum += sendcounts[i];
@@ -140,12 +150,12 @@ char * ReadLine(FILE * fp, int * dim){
         c = fgetc(fp);
         
         if(c!='\n' && c!=EOF){
-            line = (char*)realloc(line, sizeof(char)*( count+1));
+            line = (char*)realloc(line, sizeof(char)*(count+1));
             line [count++] = c;
              
         }else if(count>0){
             line = (char*)realloc(line,sizeof(char)*(count+1));
-            line [count++] = '\0';   
+            line [count] = '\0';   
         
         }
     
@@ -159,7 +169,12 @@ char * ReadLine(FILE * fp, int * dim){
 int getOrder(char * line, int length){
 	int i, count = 0, readingNumber = 0;
 	for(i = 0; i < length; i++){
-		if(!readingNumber && isnum())
+		if(!readingNumber && isdigit(line[i])){
+			readingNumber = 1;
+			count++;
+		}else if(readingNumber && !isdigit(line[i]) && line[i] != '.'){
+			readingNumber = 0;
+		}
 	}
     return count;
 }
@@ -207,7 +222,7 @@ double * getMatrix(char * filename, int * dim){
        
        free(line);
       
-       line = ReadLine(fp, &order);
+       line = ReadLine(fp, &length);
        
     
     }while(line!=NULL); 
@@ -218,6 +233,10 @@ double * getMatrix(char * filename, int * dim){
 }
 double * getVector (char * filename, int size){
         FILE * fp = fopen(filename, "r");
+		if(fp == NULL){
+			printf("invalide filename\n");
+			return NULL;
+		}
         int i=0;
         double * vector = (double*)calloc(sizeof(double), size);
 
