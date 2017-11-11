@@ -69,7 +69,7 @@ int main(int argc, char *argv[]){
     if(aux < 0) aux = 0;
     
     for(int i = 0; i < num_elements + aux; i++)
-        printf("meu rank: %d", my_rank);
+        printf("meu rank: %d\n", my_rank);
 
 /*C-Gauss jordan*/
 
