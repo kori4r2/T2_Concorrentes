@@ -4,23 +4,26 @@
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 #include "mpi.h"
 #include <omp.h>
 
 int getOrder(char * line, int length);
 char * ReadLine(FILE *input, int * dim);
-double ** getMatrix(char * filename, int * dim );
+double * getMatrix(char * filename, int * dim );
 double * getVector (char * filename, int size);
-void destroyMatrix(double ** vector, int order);
+void destroyMatrix(double * vector, int order);
 
 int main(int argc, char *argv[]){
     int *result;
     int order;
-    double ** matrix = NULL;
+    double * matrix = NULL;
     double * vector=NULL;
     int my_rank, num_proc;      
     double * recvbuf;
     int * sendcounts = NULL, * displs = NULL;
+    int pivo_col;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -32,17 +35,20 @@ int main(int argc, char *argv[]){
         printf("sou rank 0\n");
         matrix = getMatrix("matriz.txt", &order);
         vector = getVector("vetor.txt", order);
+		printf("terminei de ler");
     }
-    	
-    
-/*B-scatter da matriz/vetor (varias linhas por processo -> COMO FAZER A DIVISÃO?)*/
 
+	printf("Sou rank %d | antes:  order = %d\n", my_rank, order);
+	MPI_Bcast(&order, 1, MPI_INT, 0, MPI_COMM_WORLD);
+	printf("Sou rank %d | depois: order = %d\n", my_rank, order);
+    	
+/*B-scatter da matriz/vetor (varias linhas por processo)*/    
     
+    int remainder = (order % num_proc);
+    int num_elements = ((order / num_proc) + (my_rank < remainder)? 1: 0) * order;
+	printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
     
-    int num_elements = (order / num_proc) * order;
-    int rest = (order % num_proc);
-    
-    recvbuf = (double *)malloc(sizeof(double) * (num_elements + order));
+    recvbuf = (double *)malloc(sizeof(double) * (num_elements));
     
     if(my_rank == 0){
         sendcounts = (int *)malloc(sizeof(int) * num_proc);
@@ -53,35 +59,60 @@ int main(int argc, char *argv[]){
         for(int i = 0; i < num_proc; i++){
             sendcounts[i] = num_elements;
             
-            if(rest > 0){
-                sendcounts[i] += order;
-                rest--;
-            }
-            
             displs[i] = sum;
             sum += sendcounts[i];
         }
     }
     
-    MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, &recvbuf, num_elements + order, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, recvbuf, num_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    int aux = order - my_rank;
-    if(aux < 0) aux = 0;
-    
-    for(int i = 0; i < num_elements + aux; i++)
-        printf("meu rank: %d\n", my_rank);
+
+	int maxLoop = num_elements/order;
+	for(int i = 0; i < maxLoop; i++){
+		char string[256];
+		sprintf(string, "(My rank is %d) | ", my_rank);
+		for(int j = 0; j < order; j++){
+			sprintf(string, "%lf", recvbuf [(i * order) + j]);
+		}
+		printf("%s\n", string);
+	}
+
 
 /*C-Gauss jordan*/
 
     /*Passo 1: encontrar pivot */
-    
+
     /*Passo 2: trocar linhas*/
 
     /*Passo 3: dividir elementos da linha k pelo pivot - n tarefas */
 
     /*Passo 4: somar linha k com os valores das demais linhas */
     
-    
+    pivo_col = 0;
+
+    for(int i = 0; i < order; i++){
+    	//preciso disso?
+    	MPI_Bcast(&pivo_col, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    	//verificar localmente qual o pivo -> struct (valor absoluto, idx)
+    		//como verificar o indice?-
+    		//como verificar qual indice(linha) ja foi usado?
+
+    	//achar pivo global -> reduce (MAXLOC)
+
+    	//broadcast rank do pivo -> narcar linha como usada
+
+    	//atualizar linha do pivo
+
+    	//broadcast da linha
+
+    	//atualizar demais linhas
+
+    	//atualizar pivo_col
+    	pivo_col++;
+    }
+
+
     free(recvbuf);
     if(sendcounts != NULL)
     	free(sendcounts);
@@ -96,15 +127,8 @@ int main(int argc, char *argv[]){
 }
 
 
-void destroyMatrix(double ** matrix, int order){
-    int i;
-    for (i=0; i<order; i++){
-        
-        free(matrix[i]);
-    
-    }
+void destroyMatrix(double * matrix, int order){
     free(matrix);
-
 }
 
 char * ReadLine(FILE * fp, int * dim){
@@ -133,23 +157,18 @@ char * ReadLine(FILE * fp, int * dim){
 
 
 int getOrder(char * line, int length){
-    int count =1;
-    int i=0;
-
-    while(i<length){
-        if(line[i]==' ') count ++;
-        i++;
-    }
-    
-
+	int i, count = 0, readingNumber = 0;
+	for(i = 0; i < length; i++){
+		if(!readingNumber && isnum())
+	}
     return count;
 }
 
-double ** getMatrix(char * filename, int * dim){
+double * getMatrix(char * filename, int * dim){
 
     char * line =NULL;
 
-    double ** matrix = NULL;
+    double * matrix = NULL;
 
     int i ,k = 0,order = 0, length=0;
 
@@ -165,13 +184,11 @@ double ** getMatrix(char * filename, int * dim){
 
     *dim = order;
 
-    matrix = (double**)calloc(sizeof(double*), order);
+    matrix = (double*)calloc(sizeof(double), order * order);
       
     
         
     do {
-               
-       matrix[k] = (double*)calloc(sizeof(double), order);
          
        p=&line[0]; 
       
@@ -179,15 +196,16 @@ double ** getMatrix(char * filename, int * dim){
        
        while(i<order){
     
-            matrix[k][i++]=strtod(p, &q);
+            matrix[(k * order) + i]=strtod(p, &q);
+			i++;
             q++;
         p = q;
                     
        }
        
-       k++; 
+       k++;
        
-       free(line);   
+       free(line);
       
        line = ReadLine(fp, &order);
        
