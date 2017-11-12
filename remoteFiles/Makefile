@@ -1,4 +1,4 @@
-CFLAGS = -g -Wall -O3 -fopenmp
+CFLAGS = -g -O3 -fopenmp
 LINKFLAGS = -fopenmp -lm
 PROJECT = GaussJordan
 CC = mpicc
@@ -12,7 +12,7 @@ all : build
 
 run: build
 	unzip GaussJordan.zip
-	mpirun --hostfile hosts -np 12 GaussJordan
+	mpirun --hostfile hosts -np 12 GaussJordan > resultado.txt
 
 build : $(BINDIR) $(OBJS)
 	$(CC) $(LINKFLAGS) $(OBJS) -o $(PROJECT)
