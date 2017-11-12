@@ -1,20 +1,17 @@
-CFLAGS = -g -O3 -fopenmp
+CFLAGS = -g -fopenmp
 LINKFLAGS = -fopenmp -lm
 PROJECT = GaussJordan
 CC = mpicc
 BINDIR = bin
-SRCDIR = src
+SRCDIR = ./
 LIBDIR = lib
 LIBS := $(wildcard $(LIBDIR)/*h)
 SRCS := $(wildcard $(SRCDIR)/*c)
 OBJS := $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCS))
-all : unzip build
-
-unzip :
-	unzip GaussJordan.zip
+all : build
 
 run: build
-	mpirun --hostfile hosts -np 12 GaussJordan > resultado.txt
+	mpirun --hostfile hosts -np 11 GaussJordan
 
 build : $(BINDIR) $(OBJS)
 	$(CC) $(LINKFLAGS) $(OBJS) -o $(PROJECT)

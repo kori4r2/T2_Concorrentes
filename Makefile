@@ -29,7 +29,7 @@ remote : sendfiles
 	ssh gpra07@halley.lasdpc.icmc.usp.br -p 22200
 
 sendfiles : .zip
-	scp -P 22200 $(PROJECT).zip $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
+	scp -P 22200 $(SRCS) $(LIBS) matriz.txt vetor.txt $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
 
 clean :
 	rm -rf $(BINDIR)
@@ -37,6 +37,7 @@ clean :
 	rm -f $(PROJECT).zip
 	rm -f $(PROJECT)
 	rm -f debug*.txt
+	rm -f resultado.txt
 	clear
 
 run : build
@@ -46,7 +47,7 @@ mpi_run: build
 	mpirun -np 2 $(PROJECT)
 
 .zip : clean
-	zip $(PROJECT).zip $(SRCS) $(LIBS) *.txt
+	zip $(PROJECT).zip $(SRCS) $(LIBS) *.txt Makefile
 
 debug: $(DEBUGDIR) all
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes mpirun -np 2 $(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt

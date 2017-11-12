@@ -228,6 +228,11 @@ int main(int argc, char *argv[]){
 	    time_f -= time_i;
 	    printf("tempo: %lf\n", time_f);
 
+		FILE *fp = fopen("resultado.txt", "w");
+		for(j = 0; j < order; j++){
+            fprintf(fp, "%.3lf\n", vector[pivo_order[j]]);
+        }
+		fclose(fp);
     }
 
     //print resultado
