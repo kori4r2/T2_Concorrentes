@@ -14,14 +14,20 @@
 #define NUM_THREADS 8
 #define MAX(x,y) x>y?x:y
 
-int getOrder(char * line, int length);
+/*a partir de uma linha do arquivo de entrada, recupera a ordem da matriz pela contagem de elementos*/
+int getOrder(char * line, int length); 
+/*retorna linha a linha de um arquivo*/
 char * ReadLine(FILE *input, int * dim);
+/*recupera uma matriz e sua ordem a partir de um arquivo. Separador : ' ', arquivo : .txt*/
 double * getMatrix(char * filename, int * dim );
+/*dado um arquivo de entrada e a quantidade de linhas a serem computadas, retorna um vetor de elementos*/
 double * getVector (char * filename, int size);
+/*libera memoria utilizada pela estrutura*/
 void destroyMatrix(double * vector, int order);
 
 int main(int argc, char *argv[]){
-	int i, j, k;
+    
+    int i, j, k;
     int order;
     double * matrix = NULL;
     double * vector=NULL;
@@ -44,42 +50,40 @@ int main(int argc, char *argv[]){
 
     double time_i, time_f;
 
+
+/*Inicia processos e comunicadores*/
+
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
 
-/*A-ler arquivos: matrix e vetor*/
+/*Processo Pai : Le arquivos de entrada*/
     
     if(my_rank == 0){
-        matrix = getMatrix("matriz.txt", &order);
-		/*printf("terminei de ler a matriz\n");
-		for( i = 0; i < order; i++){
-			for( j = 0; j < order; j++){
-				printf("%2.1lf  ", matrix[(i * order) + j]);
-			}
-			printf("\n");
-		}*/
-        vector = getVector("vetor.txt", order);
-		/*printf("terminei de ler o vetor\n");
-		for(i = 0; i < order; i++){
-			printf("%.2f ", vector[i]);
-		}
-		printf("\n\n");
-		*/
-		pivo_order = (int *)malloc(sizeof(int) * order);
+   
+	matrix = getMatrix("matriz.txt", &order);
+        
+	vector = getVector("vetor.txt", order);
+        
+	pivo_order = (int *)malloc(sizeof(int) * order);
+   
     }
 
-	MPI_Bcast(&order, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+   MPI_Bcast(&order, 1, MPI_INT, 0, MPI_COMM_WORLD);
     	
-/*B-scatter da matriz/vetor (varias linhas por processo)*/    
+/*Distribui (Scatter) linhas das matrizes pelos processos*/    
     
-    int remainder = (order % num_proc);
+
+    /*calculo de carga ou granularidade e alocacao de buffer/indice*/ 
+    int remainder = (order % num_proc); 
     int num_elements = ((order / num_proc) + ((my_rank < remainder)? 1: 0)) * order;
 
-	num_rows = num_elements/order;
-	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder);
-	row_status = (char *)calloc(sizeof(char), num_rows);
-	pivo_row = (double *)malloc(sizeof(double) * order);
+    num_rows = num_elements/order;
+    ind_first_row = ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder);
+    row_status = (char *)calloc(sizeof(char), num_rows);
+    pivo_row = (double *)malloc(sizeof(double) * order);
     
     recvbuf = (double *)malloc(sizeof(double) * (num_elements));
     recvbuf_v = (double *)malloc(sizeof(double) * (num_rows));
@@ -97,8 +101,10 @@ int main(int argc, char *argv[]){
         }
     }
 
+    /*Medicao do tempo de execucao*/
     if(my_rank == 0)
     	time_i = omp_get_wtime();
+    
 
     MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, recvbuf, num_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
@@ -108,6 +114,7 @@ int main(int argc, char *argv[]){
 	    	displs[i] /= order;
 	    }
 	}
+
     MPI_Scatterv(vector, sendcounts, displs, MPI_DOUBLE, recvbuf_v, num_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
 	
@@ -117,14 +124,8 @@ int main(int argc, char *argv[]){
     pivo_col = 0;
 
     for( i = 0; i < order; i++){
-    //for( i = 0; i < 1; i++){
-    	//verificar localmente qual o pivo -> struct (valor absoluto, idx)
-    		//como verificar o indice?-
-    		//como verificar qual indice(linha) ja foi usado?
-	    		//->> numero de linhas = num_elements/order
-	    		//->INDICE DA PRIMEIRA LINHA: ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder)
-	    		//VETOR com estado de cada linha
-    	local_pivo.val = -1;
+    	
+	local_pivo.val = -1;
     	local_pivo.ind = -1;
 
     	for( j = 0; j < num_rows; j++){
@@ -216,27 +217,6 @@ int main(int argc, char *argv[]){
     	pivo_col++;
     }
 
-    /*MPI_Barrier(MPI_COMM_WORLD);
-
-    if(my_rank == 0){
-    	for(j = 0; j < num_rows; j++){
-    		for(k = 0; k < order; k++){
-    			printf("%.0lf ", recvbuf[j*order+k]);
-    		}
-    		printf("| %.3lf\n", recvbuf_v[j]);
-    	}
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-
-    if(my_rank == 1){
-    	for(j = 0; j < num_rows; j++){
-    		for(k = 0; k < order; k++){
-    			printf("%.0lf ", recvbuf[j*order+k]);
-    		}
-    		printf("| %.3lf\n", recvbuf_v[j]);
-    	}
-    }*/
 	
 
     	//VETOR COM A ORDENS DAS LINHAS DOS PIVOS
@@ -248,9 +228,6 @@ int main(int argc, char *argv[]){
 	    time_f -= time_i;
 	    printf("tempo: %lf\n", time_f);
 
-    	/*for(j = 0; j < order; j++){
-    		printf("%.3lf\n", vector[pivo_order[j]]);
-    	}*/
     }
 
     //print resultado
@@ -347,7 +324,6 @@ double * getMatrix(char * filename, int * dim){
 }
 double * getVector (char * filename, int size){
         FILE * fp = fopen(filename, "r");
-        //int aux;
 		if(fp == NULL){
 			printf("invalide filename\n");
 			return NULL;
