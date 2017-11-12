@@ -25,8 +25,11 @@ $(BINDIR) :
 $(BINDIR)/%.o : $(SRCDIR)/%.c $(LIBS)
 	$(CC) -c $< -I $(LIBDIR) $(CFLAGS) -o $@
 
-sendfiles : build
-	scp -P 22200 $(PROJECT) $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
+remote : sendfiles
+	ssh gpra07@halley.lasdpc.icmc.usp.br -p 22200
+
+sendfiles : .zip
+	scp -P 22200 $(PROJECT).zip $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
 
 clean :
 	rm -rf $(BINDIR)
@@ -43,7 +46,7 @@ mpi_run: build
 	mpirun -np 2 $(PROJECT)
 
 .zip : clean
-	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile *.pdf
+	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile
 
 debug: $(DEBUGDIR) all
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes mpirun -np 2 $(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt
