@@ -46,7 +46,7 @@ mpi_run: build
 	mpirun -np 2 $(PROJECT)
 
 .zip : clean
-	zip $(PROJECT).zip $(SRCS) $(LIBS) Makefile
+	zip $(PROJECT).zip $(SRCS) $(LIBS) *.txt
 
 debug: $(DEBUGDIR) all
 	valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes mpirun -np 2 $(PROJECT) > $(DEBUGDIR)/output.txt 2> $(DEBUGDIR)/error.txt

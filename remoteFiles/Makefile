@@ -8,10 +8,12 @@ LIBDIR = lib
 LIBS := $(wildcard $(LIBDIR)/*h)
 SRCS := $(wildcard $(SRCDIR)/*c)
 OBJS := $(patsubst $(SRCDIR)/%.c, $(BINDIR)/%.o, $(SRCS))
-all : build
+all : unzip build
+
+unzip :
+	unzip GaussJordan.zip
 
 run: build
-	unzip GaussJordan.zip
 	mpirun --hostfile hosts -np 12 GaussJordan > resultado.txt
 
 build : $(BINDIR) $(OBJS)
