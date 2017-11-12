@@ -11,7 +11,7 @@
 #include "mpi.h"
 #include <omp.h>
 
-#define NUM_THREADS 2
+#define NUM_THREADS 8
 #define MAX(x,y) x>y?x:y
 
 int getOrder(char * line, int length);
@@ -21,12 +21,13 @@ double * getVector (char * filename, int size);
 void destroyMatrix(double * vector, int order);
 
 int main(int argc, char *argv[]){
+	int i, j, k;
     int *result;
     int order;
     double * matrix = NULL;
     double * vector=NULL;
     int my_rank, num_proc;      
-    double * recvbuf;
+    double * recvbuf, *recvbuf_v;
     int * sendcounts = NULL, * displs = NULL;
     int pivo_col;
 
@@ -34,6 +35,7 @@ int main(int argc, char *argv[]){
     int ind_first_row;
     char *row_status; //1-ja foi usada como pivo, 0-nao foi usada como pivo
     double *pivo_row;
+    double pivo_row_v;
     struct pivo{
         double val;
         int ind;
@@ -46,29 +48,29 @@ int main(int argc, char *argv[]){
 /*A-ler arquivos: matrix e vetor*/
     
     if(my_rank == 0){
-        printf("sou rank 0\n");
+        //printf("sou rank 0\n");
         matrix = getMatrix("matriz.txt", &order);
-		printf("terminei de ler a matriz\n");
-		for(int i = 0; i < order; i++){
-			for(int j = 0; j < order; j++){
-				printf("%2.1lf  ", matrix[(i * order) + j]);
+		//printf("terminei de ler a matriz\n");
+		for( i = 0; i < order; i++){
+			for( j = 0; j < order; j++){
+				//printf("%2.1lf  ", matrix[(i * order) + j]);
 			}
-			printf("\n");
+			//printf("\n");
 		}
         vector = getVector("vetor.txt", order);
-		printf("terminei de ler o vetor\n");
+		//printf("terminei de ler o vetor\n");
     }
 
-	printf("Sou rank %d | antes:  order = %d\n", my_rank, order);
+	//printf("Sou rank %d | antes:  order = %d\n", my_rank, order);
 	MPI_Bcast(&order, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	printf("Sou rank %d | depois: order = %d\n", my_rank, order);
+	//printf("Sou rank %d | depois: order = %d\n", my_rank, order);
     	
 /*B-scatter da matriz/vetor (varias linhas por processo)*/    
     
-	printf("num_proc = %d\n", num_proc);
+	//printf("num_proc = %d\n", num_proc);
     int remainder = (order % num_proc);
     int num_elements = ((order / num_proc) + ((my_rank < remainder)? 1: 0)) * order;
-	printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
+	//printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
 
 	num_rows = num_elements/order;
 	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder);
@@ -76,6 +78,7 @@ int main(int argc, char *argv[]){
 	pivo_row = (double *)malloc(sizeof(double) * order);
     
     recvbuf = (double *)malloc(sizeof(double) * (num_elements));
+    recvbuf_v = (double *)malloc(sizeof(double) * (num_rows));
     
     if(my_rank == 0){
         sendcounts = (int *)malloc(sizeof(int) * num_proc);
@@ -83,9 +86,9 @@ int main(int argc, char *argv[]){
             
         int sum = 0;
         
-        for(int i = 0; i < num_proc; i++){
+        for( i = 0; i < num_proc; i++){
     		sendcounts[i] = ((order / num_proc) + ((i < remainder)? 1: 0)) * order;
-			printf("sendcounts[%d] = %d\n", i, sendcounts[i]);
+			//printf("sendcounts[%d] = %d\n", i, sendcounts[i]);
             
             displs[i] = sum;
             sum += sendcounts[i];
@@ -93,18 +96,25 @@ int main(int argc, char *argv[]){
     }
     
     MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, recvbuf, num_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    printf("terminei scatter (rank %d)\n", my_rank);	
+
+    for(i = 0; i < order; i++){
+    	sendcounts[i] /= order;
+    	displs[i] /= order;
+    }
+    MPI_Scatterv(vector, sendcounts, displs, MPI_DOUBLE, recvbuf_v, num_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+
+    //printf("terminei scatter (rank %d)\n", my_rank);	
 
 	int maxLoop = num_elements/order;
-	for(int i = 0; i < maxLoop; i++){
+	for( i = 0; i < maxLoop; i++){
 		char string[256];
-		sprintf(string, "(My rank is %d) | ", my_rank);
-		for(int j = 0; j < order; j++){
-			//printf("%s\n", string);
-			sprintf(string, "%lf", recvbuf [(i * order) + j]);
+		//sprintf(string, "(My rank is %d) | ", my_rank);
+		for( j = 0; j < order; j++){
+			////printf("%s\n", string);
+			//sprintf(string, "%lf", recvbuf [(i * order) + j]);
 
 		}
-		printf("%s\n", string);
+		//printf("%s\n", string);
 	}
 
 
@@ -120,8 +130,8 @@ int main(int argc, char *argv[]){
     
     pivo_col = 0;
 
-    //for(int i = 0; i < order; i++){
-    for(int i = 0; i < 1; i++){
+    for( i = 0; i < order; i++){
+    //for( i = 0; i < 1; i++){
     	//verificar localmente qual o pivo -> struct (valor absoluto, idx)
     		//como verificar o indice?-
     		//como verificar qual indice(linha) ja foi usado?
@@ -131,10 +141,10 @@ int main(int argc, char *argv[]){
     	local_pivo.val = -1;
     	local_pivo.ind = -1;
 
-    	for(int j = 0; j < num_rows; j++){
+    	for( j = 0; j < num_rows; j++){
 
     		if(row_status[j] == 0){
-    			//printf("(rank=%d) linha %d valida\n", my_rank, j);
+    			////printf("(rank=%d) linha %d valida\n", my_rank, j);
     			if( fabs(recvbuf[j*order + pivo_col]) > local_pivo.val ){
     				local_pivo.val = fabs(recvbuf[j*order + pivo_col]);
     				local_pivo.ind = ind_first_row + j;
@@ -143,13 +153,13 @@ int main(int argc, char *argv[]){
 
     	}
 
-    	printf("eu rank = %d  | pivo local da col %d = %lf, linha %d\n", my_rank, pivo_col, local_pivo.val, local_pivo.ind);
+    	//printf("eu rank = %d  | pivo local da col %d = %lf, linha %d\n", my_rank, pivo_col, local_pivo.val, local_pivo.ind);
     	//achar pivo global -> reduce (MAXLOC)
 
     	MPI_Reduce( &local_pivo, &pivo_reduce, 1, MPI_DOUBLE_INT, MPI_MAXLOC, 0, MPI_COMM_WORLD ); 
 
     	if(my_rank == 0){
-    		printf("(rank=%d) resultado do reduce: (%lf, %d)\n", my_rank, pivo_reduce.val, pivo_reduce.ind);
+    		//printf("(rank=%d) resultado do reduce: (%lf, %d)\n", my_rank, pivo_reduce.val, pivo_reduce.ind);
     	}
 
     	//broadcast rank do pivo -> marcar linha como usada
@@ -167,37 +177,40 @@ int main(int argc, char *argv[]){
     	if(pivo_reduce.ind >= ind_first_row && pivo_reduce.ind <= ind_first_row+num_rows){
     		row_status[local_pivo_row] = 1;
 
-    		for(int j = 0; j < order; j++){
+    		for( j = 0; j < order; j++){
 	    		pivo_row[j] = recvbuf[local_pivo_row * order + j];
 	    	}
+	    	pivo_row_v = recvbuf_v[local_pivo_row]/pivo_row[pivo_col];
 
-	    	#pragma omp parallel num_threads(NUM_THREADS) shared (order)
+	    	int val = pivo_reduce.val;
+	    	#pragma omp parallel num_threads(NUM_THREADS) shared (order, val, pivo_row, pivo_col)
 			{
 	    		//pragama parallel
 	    			//pragam for
 	    			//
 	    		//
-	    		int val = pivo_reduce.val;
-	    		#pragma omp for shared(val, pivo_row, pivo_col)
-	    		{
+	    		
+	    		#pragma omp for
+	    		
 	    			for (int k = pivo_col+1; k < order; k++){
 	    				pivo_row[k] = pivo_row[k]/pivo_row[pivo_col];
 	    			}
-	    		}
+	    		
 	    		pivo_row[pivo_col] = 1;
 			}
 
 
-			for(int j = 0; j < order; j++)
-    			printf("(rank %d) linha pivo att: (%d) %lf\n", my_rank, j, pivo_row[j]);
+			//for( j = 0; j < order; j++)
+    			//printf("(rank %d) linha pivo att: (%d) %lf\n", my_rank, j, pivo_row[j]);
     	}
 
 
     	//broadcast da linha
 
     	MPI_Bcast(pivo_row, order, MPI_DOUBLE, pivo_rank, MPI_COMM_WORLD);
+    	MPI_Bcast(&pivo_row_v, 1, MPI_DOUBLE, pivo_rank, MPI_COMM_WORLD);
 
-    	printf("(rank=%d)bcast pivo row att: %lf\n", my_rank, pivo_row[2]);
+    	//printf("(rank=%d)bcast pivo row att: %lf\n", my_rank, pivo_row[2]);
 
     	//atualizar demais linhas
 
@@ -206,32 +219,89 @@ int main(int argc, char *argv[]){
     			//
     		//
 
-    	#pragma omp parallel num_threads(NUM_THREADS) shared (num_rows)
-		{
+    	
     		//pragama parallel
     			//pragam for
     			//
     		//
-    		for(int j = 0; j < num_rows; j++){
-	    		if( ind_first_row + j != pivo_reduce.ind ){	
-	    			double factor = recvbuf[j * order + pivo_col];
-	    			printf("(rank %d) factor = %lf, row = %d\n",my_rank, factor, ind_first_row+j );
-		    		#pragma omp for shared(recvbuf, pivo_row, pivo_col, factor, j, order)
-		    		{
-		    			for (int k = pivo_col+1; k < order; k++){
+		for(j = 0; j < num_rows; j++){
+
+    		if( ind_first_row + j != pivo_reduce.ind ){	
+    			double factor = recvbuf[j * order + pivo_col];
+    			/*printf("(rank %d) factor = %lf, row = %d\n",my_rank, factor, ind_first_row+j );
+	    			
+
+						char string_teste[256];
+						sprintf(string_teste, "(My rank is %d) | BEFORE (row %d): ", my_rank, j+ind_first_row);
+						for(int l = 0; l < order; l++){
+							////printf("%s\n", string);
+							sprintf(string_teste+strlen(string_teste), "%lf ", recvbuf [(j * order) + l]);
+
+						}
+						printf("%s\n", string_teste);
+				*/		
+
+				recvbuf_v[j] = recvbuf_v[j] - (factor * pivo_row_v);
+    			#pragma omp parallel num_threads(NUM_THREADS) shared (num_rows, recvbuf, pivo_row, pivo_col, factor, j, order)
+				{
+		    		#pragma omp for
+		    		
+		    			for (k = pivo_col+1; k < order; k++){
 		    				recvbuf[j * order + k] = recvbuf[j * order + k] - (factor * pivo_row[k]);
-		    				printf("===============(rank %d, thread %d)new value of (%d, %d): %lf\n", my_rank, omp_get_thread_num(), j+ind_first_row, k, recvbuf[j * order + k]);
+		    				//printf("===============(rank %d, thread %d)new value of (%d, %d): %lf\n", my_rank, omp_get_thread_num(), j+ind_first_row, k, recvbuf[j * order + k]);
 		    			}
-		    		}
+		    		
 		    		recvbuf[j * order + pivo_col] = 0;
 		    	}
+
+
+
+		    	/*		sprintf(string_teste, "(My rank is %d) | AFTER (row %d): ", my_rank, j+ind_first_row);
+						for(int l = 0; l < order; l++){
+							////printf("%s\n", string);
+							sprintf(string_teste+strlen(string_teste), "%lf ", recvbuf [(j * order) + l]);
+
+						}
+						printf("%s\n", string_teste);
+				*/
+
+	    	} else {
+	    		for(k = pivo_col; k < order; k++){
+
+	    			recvbuf[j * order + k] = pivo_row[k];	
+	    		}
+
+	    		recvbuf_v[local_pivo_row] = pivo_row_v;
 	    	}
-		}
+    	}
+		
 
 
 
     	//atualizar pivo_col
     	pivo_col++;
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if(my_rank == 0){
+    	for(j = 0; j < num_rows; j++){
+    		for(k = 0; k < order; k++){
+    			printf("%lf ", recvbuf[j*order+k]);
+    		}
+    		printf("\n");
+    	}
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    if(my_rank == 1){
+    	for(j = 0; j < num_rows; j++){
+    		for(k = 0; k < order; k++){
+    			printf("%lf ", recvbuf[j*order+k]);
+    		}
+    		printf("| %d\n", recvbuf_v[j]);
+    	}
     }
 
     	//VETOR COM A ORDENS DAS LINHAS DOS PIVOS
