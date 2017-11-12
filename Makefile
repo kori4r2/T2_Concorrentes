@@ -1,4 +1,4 @@
-CFLAGS = -g -Wall -O3
+CFLAGS = -g -Wall -O3 -fopenmp
 LINKFLAGS = -fopenmp -lm
 PROJECT = GaussJordan
 CC = mpicc
