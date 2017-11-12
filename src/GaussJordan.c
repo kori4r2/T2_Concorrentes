@@ -248,9 +248,9 @@ int main(int argc, char *argv[]){
 	    time_f -= time_i;
 	    printf("tempo: %lf\n", time_f);
 
-    	for(j = 0; j < order; j++){
+    	/*for(j = 0; j < order; j++){
     		printf("%.3lf\n", vector[pivo_order[j]]);
-    	}
+    	}*/
     }
 
     //print resultado
