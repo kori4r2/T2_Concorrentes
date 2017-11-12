@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include "mpi.h"
 #include <omp.h>
 
@@ -32,7 +33,7 @@ int main(int argc, char *argv[]){
     struct pivo{
         double val;
         int ind;
-    } local_pivo;
+    } local_pivo, pivo_reduce;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
@@ -66,7 +67,7 @@ int main(int argc, char *argv[]){
 	printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
 
 	num_rows = num_elements/order;
-	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<rest?my_rank:rest);
+	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder);
 	row_status = (char *)calloc(sizeof(char), num_rows);
     
     recvbuf = (double *)malloc(sizeof(double) * (num_elements));
@@ -87,14 +88,16 @@ int main(int argc, char *argv[]){
     }
     
     MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, recvbuf, num_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-
+    printf("terminei scatter (rank %d)\n", my_rank);	
 
 	int maxLoop = num_elements/order;
 	for(int i = 0; i < maxLoop; i++){
 		char string[256];
 		sprintf(string, "(My rank is %d) | ", my_rank);
 		for(int j = 0; j < order; j++){
+			//printf("%s\n", string);
 			sprintf(string, "%lf", recvbuf [(i * order) + j]);
+
 		}
 		printf("%s\n", string);
 	}
@@ -116,18 +119,32 @@ int main(int argc, char *argv[]){
     	//verificar localmente qual o pivo -> struct (valor absoluto, idx)
     		//como verificar o indice?-
     		//como verificar qual indice(linha) ja foi usado?
-
 	    		//->> numero de linhas = num_elements/order
-	    		//->INDICE DA PRIMEIRA LINHA: ((order/num_proc) )*my_rank +(my_rank<rest?my_rank:rest)
+	    		//->INDICE DA PRIMEIRA LINHA: ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder)
 	    		//VETOR com estado de cada linha
+    	local_pivo.val = -1;
+    	local_pivo.ind = -1;
+
     	for(int j = 0; j < num_rows; j++){
 
-    		
+    		if(row_status[j] == 0){
+    			//printf("(rank=%d) linha %d valida\n", my_rank, j);
+    			if( fabs(recvbuf[j*order + pivo_col]) > local_pivo.val ){
+    				local_pivo.val = fabs(recvbuf[j*order + pivo_col]);
+    				local_pivo.ind = ind_first_row + j;
+    			}
+    		}
 
     	}
 
-
+    	printf("eu rank = %d  | pivo local da col %d = %lf, linha %d\n", my_rank, pivo_col, local_pivo.val, local_pivo.ind);
     	//achar pivo global -> reduce (MAXLOC)
+
+    	MPI_Reduce( &local_pivo, &pivo_reduce, 1, MPI_DOUBLE_INT, MPI_MAXLOC, 0, MPI_COMM_WORLD ); 
+
+    	if(my_rank == 0){
+    		printf("===============(rank=%d) resultado do reduce: (%lf, %d)\n", my_rank, pivo_reduce.val, pivo_reduce.ind);
+    	}
 
     	//broadcast rank do pivo -> marcar linha como usada
 
@@ -141,6 +158,9 @@ int main(int argc, char *argv[]){
     	pivo_col++;
     }
 
+    //gather -> resultado
+
+    //print resultado
 
     free(recvbuf);
     if(sendcounts != NULL)
