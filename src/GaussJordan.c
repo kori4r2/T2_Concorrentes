@@ -22,7 +22,6 @@ void destroyMatrix(double * vector, int order);
 
 int main(int argc, char *argv[]){
 	int i, j, k;
-    int *result;
     int order;
     double * matrix = NULL;
     double * vector=NULL;
@@ -48,29 +47,28 @@ int main(int argc, char *argv[]){
 /*A-ler arquivos: matrix e vetor*/
     
     if(my_rank == 0){
-        //printf("sou rank 0\n");
         matrix = getMatrix("matriz.txt", &order);
-		//printf("terminei de ler a matriz\n");
+		printf("terminei de ler a matriz\n");
 		for( i = 0; i < order; i++){
 			for( j = 0; j < order; j++){
-				//printf("%2.1lf  ", matrix[(i * order) + j]);
+				printf("%2.1lf  ", matrix[(i * order) + j]);
 			}
-			//printf("\n");
+			printf("\n");
 		}
         vector = getVector("vetor.txt", order);
-		//printf("terminei de ler o vetor\n");
+		printf("terminei de ler o vetor\n");
+		for(i = 0; i < order; i++){
+			printf("%.2f ", vector[i]);
+		}
+		printf("\n\n");
     }
 
-	//printf("Sou rank %d | antes:  order = %d\n", my_rank, order);
 	MPI_Bcast(&order, 1, MPI_INT, 0, MPI_COMM_WORLD);
-	//printf("Sou rank %d | depois: order = %d\n", my_rank, order);
     	
 /*B-scatter da matriz/vetor (varias linhas por processo)*/    
     
-	//printf("num_proc = %d\n", num_proc);
     int remainder = (order % num_proc);
     int num_elements = ((order / num_proc) + ((my_rank < remainder)? 1: 0)) * order;
-	//printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
 
 	num_rows = num_elements/order;
 	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<remainder?my_rank:remainder);
@@ -88,8 +86,6 @@ int main(int argc, char *argv[]){
         
         for( i = 0; i < num_proc; i++){
     		sendcounts[i] = ((order / num_proc) + ((i < remainder)? 1: 0)) * order;
-			//printf("sendcounts[%d] = %d\n", i, sendcounts[i]);
-            
             displs[i] = sum;
             sum += sendcounts[i];
         }
@@ -97,36 +93,20 @@ int main(int argc, char *argv[]){
     
     MPI_Scatterv(matrix, sendcounts, displs, MPI_DOUBLE, recvbuf, num_elements, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    for(i = 0; i < order; i++){
-    	sendcounts[i] /= order;
-    	displs[i] /= order;
-    }
+	if(my_rank == 0){
+	    for(i = 0; i < num_proc; i++){
+	    	sendcounts[i] /= order;
+	    	displs[i] /= order;
+	    }
+	}
     MPI_Scatterv(vector, sendcounts, displs, MPI_DOUBLE, recvbuf_v, num_rows, MPI_DOUBLE, 0, MPI_COMM_WORLD);
 
-    //printf("terminei scatter (rank %d)\n", my_rank);	
-
-	int maxLoop = num_elements/order;
-	for( i = 0; i < maxLoop; i++){
-		char string[256];
-		//sprintf(string, "(My rank is %d) | ", my_rank);
-		for( j = 0; j < order; j++){
-			////printf("%s\n", string);
-			//sprintf(string, "%lf", recvbuf [(i * order) + j]);
-
-		}
-		//printf("%s\n", string);
+	if(my_rank == 0){
+    	free(sendcounts);
+    	free(displs);
 	}
 
-
 /*C-Gauss jordan*/
-
-    /*Passo 1: encontrar pivot */
-
-    /*Passo 2: trocar linhas*/
-
-    /*Passo 3: dividir elementos da linha k pelo pivot - n tarefas */
-
-    /*Passo 4: somar linha k com os valores das demais linhas */
     
     pivo_col = 0;
 
@@ -144,7 +124,6 @@ int main(int argc, char *argv[]){
     	for( j = 0; j < num_rows; j++){
 
     		if(row_status[j] == 0){
-    			////printf("(rank=%d) linha %d valida\n", my_rank, j);
     			if( fabs(recvbuf[j*order + pivo_col]) > local_pivo.val ){
     				local_pivo.val = fabs(recvbuf[j*order + pivo_col]);
     				local_pivo.ind = ind_first_row + j;
@@ -153,14 +132,8 @@ int main(int argc, char *argv[]){
 
     	}
 
-    	//printf("eu rank = %d  | pivo local da col %d = %lf, linha %d\n", my_rank, pivo_col, local_pivo.val, local_pivo.ind);
     	//achar pivo global -> reduce (MAXLOC)
-
     	MPI_Reduce( &local_pivo, &pivo_reduce, 1, MPI_DOUBLE_INT, MPI_MAXLOC, 0, MPI_COMM_WORLD ); 
-
-    	if(my_rank == 0){
-    		//printf("(rank=%d) resultado do reduce: (%lf, %d)\n", my_rank, pivo_reduce.val, pivo_reduce.ind);
-    	}
 
     	//broadcast rank do pivo -> marcar linha como usada
 
@@ -180,28 +153,18 @@ int main(int argc, char *argv[]){
     		for( j = 0; j < order; j++){
 	    		pivo_row[j] = recvbuf[local_pivo_row * order + j];
 	    	}
-	    	pivo_row_v = recvbuf_v[local_pivo_row]/pivo_row[pivo_col];
+	    	pivo_row_v = recvbuf_v[local_pivo_row];
 
-	    	int val = pivo_reduce.val;
-	    	#pragma omp parallel num_threads(NUM_THREADS) shared (order, val, pivo_row, pivo_col)
+	    	#pragma omp parallel num_threads(NUM_THREADS) shared (order, pivo_row, pivo_col)
 			{
-	    		//pragama parallel
-	    			//pragam for
-	    			//
-	    		//
-	    		
 	    		#pragma omp for
-	    		
 	    			for (int k = pivo_col+1; k < order; k++){
 	    				pivo_row[k] = pivo_row[k]/pivo_row[pivo_col];
 	    			}
-	    		
-	    		pivo_row[pivo_col] = 1;
+
+				pivo_row_v /= pivo_row[pivo_col];
+   	    		pivo_row[pivo_col] = 1;
 			}
-
-
-			//for( j = 0; j < order; j++)
-    			//printf("(rank %d) linha pivo att: (%d) %lf\n", my_rank, j, pivo_row[j]);
     	}
 
 
@@ -210,36 +173,11 @@ int main(int argc, char *argv[]){
     	MPI_Bcast(pivo_row, order, MPI_DOUBLE, pivo_rank, MPI_COMM_WORLD);
     	MPI_Bcast(&pivo_row_v, 1, MPI_DOUBLE, pivo_rank, MPI_COMM_WORLD);
 
-    	//printf("(rank=%d)bcast pivo row att: %lf\n", my_rank, pivo_row[2]);
-
     	//atualizar demais linhas
-
-    		//pragama parallel
-    			//pragam for
-    			//
-    		//
-
-    	
-    		//pragama parallel
-    			//pragam for
-    			//
-    		//
 		for(j = 0; j < num_rows; j++){
 
     		if( ind_first_row + j != pivo_reduce.ind ){	
     			double factor = recvbuf[j * order + pivo_col];
-    			/*printf("(rank %d) factor = %lf, row = %d\n",my_rank, factor, ind_first_row+j );
-	    			
-
-						char string_teste[256];
-						sprintf(string_teste, "(My rank is %d) | BEFORE (row %d): ", my_rank, j+ind_first_row);
-						for(int l = 0; l < order; l++){
-							////printf("%s\n", string);
-							sprintf(string_teste+strlen(string_teste), "%lf ", recvbuf [(j * order) + l]);
-
-						}
-						printf("%s\n", string_teste);
-				*/		
 
 				recvbuf_v[j] = recvbuf_v[j] - (factor * pivo_row_v);
     			#pragma omp parallel num_threads(NUM_THREADS) shared (num_rows, recvbuf, pivo_row, pivo_col, factor, j, order)
@@ -248,35 +186,21 @@ int main(int argc, char *argv[]){
 		    		
 		    			for (k = pivo_col+1; k < order; k++){
 		    				recvbuf[j * order + k] = recvbuf[j * order + k] - (factor * pivo_row[k]);
-		    				//printf("===============(rank %d, thread %d)new value of (%d, %d): %lf\n", my_rank, omp_get_thread_num(), j+ind_first_row, k, recvbuf[j * order + k]);
 		    			}
 		    		
 		    		recvbuf[j * order + pivo_col] = 0;
 		    	}
 
-
-
-		    	/*		sprintf(string_teste, "(My rank is %d) | AFTER (row %d): ", my_rank, j+ind_first_row);
-						for(int l = 0; l < order; l++){
-							////printf("%s\n", string);
-							sprintf(string_teste+strlen(string_teste), "%lf ", recvbuf [(j * order) + l]);
-
-						}
-						printf("%s\n", string_teste);
-				*/
-
 	    	} else {
 	    		for(k = pivo_col; k < order; k++){
 
-	    			recvbuf[j * order + k] = pivo_row[k];	
+	    			recvbuf[j * order + k] = pivo_row[k];
 	    		}
 
 	    		recvbuf_v[local_pivo_row] = pivo_row_v;
 	    	}
     	}
 		
-
-
 
     	//atualizar pivo_col
     	pivo_col++;
@@ -289,7 +213,7 @@ int main(int argc, char *argv[]){
     		for(k = 0; k < order; k++){
     			printf("%lf ", recvbuf[j*order+k]);
     		}
-    		printf("\n");
+    		printf("| %.3lf\n", recvbuf_v[j]);
     	}
     }
 
@@ -300,9 +224,10 @@ int main(int argc, char *argv[]){
     		for(k = 0; k < order; k++){
     			printf("%lf ", recvbuf[j*order+k]);
     		}
-    		printf("| %d\n", recvbuf_v[j]);
+    		printf("| %.3lf\n", recvbuf_v[j]);
     	}
     }
+	
 
     	//VETOR COM A ORDENS DAS LINHAS DOS PIVOS
     //gather -> resultado
@@ -310,13 +235,13 @@ int main(int argc, char *argv[]){
     //print resultado
 
     free(recvbuf);
-    if(sendcounts != NULL)
-    	free(sendcounts);
-    if(displs != NULL)
-    	free(displs);
-    
-    destroyMatrix(matrix, order);
-    free(vector);
+	free(row_status);
+	free(pivo_row);
+	free(recvbuf_v);
+	if(my_rank == 0){
+	    free(vector);
+	    destroyMatrix(matrix, order);
+	}
 
     MPI_Finalize();
     return 0;
@@ -368,51 +293,31 @@ int getOrder(char * line, int length){
 double * getMatrix(char * filename, int * dim){
 
     char * line =NULL;
-
     double * matrix = NULL;
-
     int i ,k = 0,order = 0, length=0;
-
     FILE * fp = fopen(filename, "r");
-
     char * p, *q;
-
-    
     
     line = ReadLine(fp, &length);
-    
     order = getOrder (line, length);
-
     *dim = order;
-
     matrix = (double*)calloc(sizeof(double), order * order);
-      
-    
         
     do {
-         
        p=&line[0]; 
-      
        i=0;
        
        while(i<order){
-    
-            matrix[(k * order) + i]=strtod(p, &q);
-			i++;
-            q++;
-        p = q;
-                    
+          matrix[(k * order) + i]=strtod(p, &q);
+		  i++;
+          q++;
+          p = q;
        }
-       
-       k++;
-       
-       free(line);
-      
-       line = ReadLine(fp, &length);
-       
-    
-    }while(line!=NULL); 
 
+       k++;
+       free(line);
+       line = ReadLine(fp, &length);
+    }while(line!=NULL); 
 
     fclose(fp);
     return matrix;
@@ -433,4 +338,3 @@ double * getVector (char * filename, int size){
         fclose(fp);
         return vector;
 }
-
