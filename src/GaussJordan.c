@@ -26,6 +26,14 @@ int main(int argc, char *argv[]){
     int * sendcounts = NULL, * displs = NULL;
     int pivo_col;
 
+    int num_rows;
+    int ind_first_row;
+    char *row_status; //1-ja foi usada como pivo, 0-nao foi usada como pivo
+    struct pivo{
+        double val;
+        int ind;
+    } local_pivo;
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &num_proc);
@@ -56,6 +64,10 @@ int main(int argc, char *argv[]){
     int remainder = (order % num_proc);
     int num_elements = ((order / num_proc) + ((my_rank < remainder)? 1: 0)) * order;
 	printf("Sour rank %d, num_elements = %d, remainder = %d, order = %d\n", my_rank, num_elements, remainder, order);
+
+	num_rows = num_elements/order;
+	ind_first_row = ((order/num_proc) )*my_rank +(my_rank<rest?my_rank:rest);
+	row_status = (char *)calloc(sizeof(char), num_rows);
     
     recvbuf = (double *)malloc(sizeof(double) * (num_elements));
     
@@ -108,6 +120,12 @@ int main(int argc, char *argv[]){
 	    		//->> numero de linhas = num_elements/order
 	    		//->INDICE DA PRIMEIRA LINHA: ((order/num_proc) )*my_rank +(my_rank<rest?my_rank:rest)
 	    		//VETOR com estado de cada linha
+    	for(int j = 0; j < num_rows; j++){
+
+    		
+
+    	}
+
 
     	//achar pivo global -> reduce (MAXLOC)
 
