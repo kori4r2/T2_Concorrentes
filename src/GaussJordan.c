@@ -11,6 +11,8 @@
 #include "mpi.h"
 #include <omp.h>
 
+#define NUM_THREADS 2
+
 int getOrder(char * line, int length);
 char * ReadLine(FILE *input, int * dim);
 double * getMatrix(char * filename, int * dim );
@@ -148,11 +150,36 @@ int main(int argc, char *argv[]){
 
     	//broadcast rank do pivo -> marcar linha como usada
 
+    	MPI_Bcast(&pivo_reduce, 1, MPI_DOUBLE_INT, 0, MPI_COMM_WORLD);
+
     	//atualizar linha do pivo
+
+    	if(pivo_reduce.ind >= ind_first_row && pivo_reduce.ind <= ind_first_row+num_rows){
+    		row_status[pivo_reduce.ind - ind_first_row] = 1;
+    	}
+
+    	#pragma omp parallel num_threads(NUM_THREADS) shared (order)
+		{
+    		//pragama parallel
+    			//pragam for
+    			//
+    		//
+    		#pragma omp for shared()
+    		{
+    			for (int k = pivo_col+1; k < order; k++){
+    				
+    			}
+    		}
+		}
 
     	//broadcast da linha
 
     	//atualizar demais linhas
+
+    		//pragama parallel
+    			//pragam for
+    			//
+    		//
 
     	//atualizar pivo_col
     	pivo_col++;
