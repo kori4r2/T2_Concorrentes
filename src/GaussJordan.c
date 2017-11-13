@@ -46,9 +46,9 @@ int main(int argc, char *argv[]){
         int ind;
     } local_pivo, pivo_reduce;
 
-    int * pivo_order;
+    int * pivo_order = NULL;
 
-    double time_i, time_f;
+    double time_i = 0, time_f;
 
 
 /*Inicia processos e comunicadores*/
@@ -121,11 +121,9 @@ int main(int argc, char *argv[]){
 
 /*C-Gauss jordan*/
     
-    pivo_col = 0;
-
-    for( i = 0; i < order; i++){
+    for( pivo_col = 0; pivo_col < order; pivo_col++){
     	
-	local_pivo.val = -1;
+		local_pivo.val = -1;
     	local_pivo.ind = -1;
 
     	for( j = 0; j < num_rows; j++){
@@ -161,9 +159,13 @@ int main(int argc, char *argv[]){
     	if(pivo_reduce.ind >= ind_first_row && pivo_reduce.ind <= ind_first_row+num_rows){
     		row_status[local_pivo_row] = 1;
 
-    		for( j = 0; j < order; j++){
-	    		pivo_row[j] = recvbuf[local_pivo_row * order + j];
-	    	}
+			#pragma omp parallel num_threads(NUM_THREADS) shared (order, local_pivo_row, pivo_row, recvbuf)
+			{
+				#pragma omp for
+	    		for( j = 0; j < order; j++){
+		    		pivo_row[j] = recvbuf[local_pivo_row * order + j];
+		    	}
+			}
 	    	pivo_row_v = recvbuf_v[local_pivo_row];
 
 	    	#pragma omp parallel num_threads(NUM_THREADS) shared (order, pivo_row, pivo_col)
@@ -194,27 +196,25 @@ int main(int argc, char *argv[]){
     			#pragma omp parallel num_threads(NUM_THREADS) shared (num_rows, recvbuf, pivo_row, pivo_col, factor, j, order)
 				{
 		    		#pragma omp for
-		    		
-		    			for (k = pivo_col+1; k < order; k++){
-		    				recvbuf[j * order + k] = recvbuf[j * order + k] - (factor * pivo_row[k]);
-		    			}
+		    		for (k = pivo_col+1; k < order; k++){
+		    			recvbuf[j * order + k] = recvbuf[j * order + k] - (factor * pivo_row[k]);
+		    		}
 		    		
 		    		recvbuf[j * order + pivo_col] = 0;
 		    	}
 
 	    	} else {
-	    		for(k = pivo_col; k < order; k++){
-
-	    			recvbuf[j * order + k] = pivo_row[k];
-	    		}
+    			#pragma omp parallel num_threads(NUM_THREADS) shared (recvbuf, pivo_row, pivo_col, j, order)
+				{
+					#pragma omp for
+		    		for(k = pivo_col; k < order; k++){
+		    			recvbuf[j * order + k] = pivo_row[k];
+		    		}
+				}
 
 	    		recvbuf_v[local_pivo_row] = pivo_row_v;
 	    	}
     	}
-		
-
-    	//atualizar pivo_col
-    	pivo_col++;
     }
 
 	

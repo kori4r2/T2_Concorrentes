@@ -25,10 +25,10 @@ $(BINDIR) :
 $(BINDIR)/%.o : $(SRCDIR)/%.c $(LIBS)
 	$(CC) -c $< -I $(LIBDIR) $(CFLAGS) -o $@
 
-remote : sendfiles
+remote :
 	ssh gpra07@halley.lasdpc.icmc.usp.br -p 22200
 
-sendfiles : .zip
+sendfiles :
 	scp -P 22200 $(SRCS) $(LIBS) matriz.txt vetor.txt $(SERVERFILES) gpra07@halley.lasdpc.icmc.usp.br:/home/gpra07/
 
 clean :
