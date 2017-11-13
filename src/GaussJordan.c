@@ -58,7 +58,8 @@ int main(int argc, char *argv[]){
     } local_pivo, pivo_reduce;
 
     int *pivo_order = NULL;
-    double time_i = 0, time_f;
+
+//	double time_i = 0, time_f;
 
 
 /*Inicia processos e comunicadores*/
@@ -106,8 +107,10 @@ int main(int argc, char *argv[]){
     }
 
     /*Medicao do tempo de execucao*/
+	/*
     if(my_rank == 0)
     	time_i = omp_get_wtime();
+	*/
     
 
 	/*Distribuicao dos valores pelos processos*/
